@@ -23,6 +23,17 @@ A dry-run running of the code for single-position decon data would take the foll
     
 to then actually rename the files, run the same command without the '--d' flag 
 
+
+A dry-run running of the code on Windows for "burst" acquisitions on deconvolved data (collated in one folder) would take the following form:
+
+    python file_renamer.py "D:\\\\Will\\\\deskew_after_decon\\\\20261003_exp01_2dpf_scan1_mp\\\\FOV1" deskew burst --d
+
+"burst" acquisitions
+Loop through time (for example, every hour for 8 hours)
+    Loop through positions
+        Image a time series (for example, acquire 12 z-stacks with 5s between z-stacks)
+
+
 """
 import os
 import sys
@@ -36,7 +47,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Simple file renamer for putting MOSAIC images into BDV-compatible format')
     parser.add_argument('inpath', type=Path, help='path to the data')
     parser.add_argument('fflag', type=str, help='state of file to rename: e.g. mip, decon, deskew')
-    parser.add_argument('typeflag', type=str, help='acquisition type: scan or tile')
+    parser.add_argument('typeflag', type=str, help='acquisition type: scan, tile, burst')
     parser.add_argument('--dry-run', '-d',default=False, action='store_true', dest='dryrun',help='execute by printing names to output.txt rather than renaming')
     args = parser.parse_args()
     return args
@@ -88,6 +99,10 @@ def file_renamer(attributes,folder,tag,atype,dryrun=False):
     tiles_dict = {tiles[i]:('_tile'+str(i)) for i in range(len(tiles))}
     chN_A += 1
     original_stdout = sys.stdout
+
+    # For burst acquisitions, find number of timepoints within inner time loop
+    N_timepoints_in_Iter = len({m.group(1) for f in Path(folder).iterdir()
+              if (m := re.search(r"stack(\d{4})", f.name))})
     
     # Rename files (or print to output.txt if --dry-run)
     with open(Path(folder) / Path('output.txt'),'w') as file:
@@ -114,11 +129,40 @@ def file_renamer(attributes,folder,tag,atype,dryrun=False):
                     chStr = str(chStr).zfill(2)
                     # dst = f'scan_Cam_'+re.sub('A','0',details['Cam'])+'_ch_'+details['ch']+tile+'_t_'+details['stack']+'.tif'
                     dst = f'scan_ch'+chStr+tile+'_t'+details[attributes[-1]]+'.tif'
+
+                    # if 'burst', _t####.tif needs an offset based on how many timepoints have occured
+                    if len(details) == 4: # ugly code, but non-burst types have len (3)
+                        # maybe instead use presence of "Iter_" and "stack"
+                        iter_value = details[attributes[-2]]
+                        stack_timepoint = details[attributes[-1]]
+                        rescaled_t = N_timepoints_in_Iter * int(details[attributes[-2]]) + int(details[attributes[-1]])
+                        
+                        # It would be convenient to have a fast way of identifying the different time series,
+                        # so add the Iter information
+                        # /Surely/ no one will do tiled burst acquisitions
+                        dst = f'scan_ch'+chStr+'_Iter'+ iter_value +'_t'+str(rescaled_t).zfill(4)+'.tif'
+                        
+                    
                 else:
                     chStr = int(details[attributes[1]])+10
                     chStr = str(chStr).zfill(2)
                     # dst = f'scan_Cam_'+re.sub('B','1',details['Cam'])+'_ch_'+str(int(details['ch'])+N_ch_CamA)+tile+'_t_'+details['stack']+'.tif'
                     dst = f'scan_ch'+chStr+tile+'_t'+details[attributes[-1]]+'.tif' # CamB will be offset by 10 to avoid overlapping file names
+
+                    # if 'burst', _t####.tif needs an offset based on how many timepoints have occured
+                    if len(details) == 4: # ugly code, but non-burst types have len (3)
+                        
+                        iter_value = details[attributes[-2]]
+                        stack_timepoint = details[attributes[-1]]
+                        rescaled_t = N_timepoints_in_Iter * int(iter_value) + int(stack_timepoint)
+
+                        # It would be convenient to have a fast way of identifying the different time series,
+                        # so add the Iter information
+                        # /Surely/ no one will do tiled burst acquisitions
+
+                        dst = f'scan_ch'+chStr+'_Iter'+iter_value+'_t'+str(rescaled_t).zfill(4)+'.tif'
+
+
 
                 src = Path(folder) / Path(filename)
                 dst_new = Path(folder) / tag_filename(dst,tag)
@@ -153,10 +197,14 @@ def main():
     #### Choose which naming scheme the MOSAIC is using
     #### 'scan' (should) cover any single-position acquisition
     #### 'tile' (should) cover any multi-position acquisition such as tiled or multiple disconnected positions
+    #### 'burst' covers multi-position acquisitions with two timeloops 
+    #            (e.g. every hour, go to position 1, image N stacks every P seconds, move to position 2, image N stacks every P seconds...)
     if args.typeflag =='scan':
         ids = [r'Cam',r'ch',r'stack']
     elif args.typeflag == 'tile':
         ids = [r'Cam',r'ch',r'Iter_']
+    elif args.typeflag == 'burst':
+        ids = [r'Cam',r'ch',r'Iter_',r'stack']
 
     file_renamer(ids,folder=args.inpath,tag=args.fflag,atype=args.typeflag,dryrun=args.dryrun)
 
