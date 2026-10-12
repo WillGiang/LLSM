@@ -48,7 +48,7 @@ def parse_args():
     parser.add_argument('inpath', type=Path, help='path to the data')
     parser.add_argument('fflag', type=str, help='state of file to rename: e.g. mip, decon, deskew')
     parser.add_argument('typeflag', type=str, help='acquisition type: scan, tile, burst')
-    parser.add_argument('--dry-run', '-d',default=False, action='store_true', dest='dryrun',help='execute by printing names to output.txt rather than renaming')
+    parser.add_argument('--dry-run', '-d',default=False, action='store_true', dest='dryrun',help='Only print names to output_file_renamer.txt rather than renaming')
     args = parser.parse_args()
     return args
 
@@ -104,8 +104,8 @@ def file_renamer(attributes,folder,tag,atype,dryrun=False):
     N_timepoints_in_Iter = len({m.group(1) for f in Path(folder).iterdir()
               if (m := re.search(r"stack(\d{4})", f.name))})
     
-    # Rename files (or print to output.txt if --dry-run)
-    with open(Path(folder) / Path('output.txt'),'w') as file:
+    # Rename files (or print to output_file_renamer.txt if --dry-run)
+    with open(Path(folder) / Path('output_file_renamer.txt'),'w') as file:
         sys.stdout = file
         for count, filename in enumerate(os.listdir(folder)):
             
@@ -166,12 +166,14 @@ def file_renamer(attributes,folder,tag,atype,dryrun=False):
 
                 src = Path(folder) / Path(filename)
                 dst_new = Path(folder) / tag_filename(dst,tag)
-                # os.rename(src,dst)
+
                 fnames.append(dst_new)
-                if dryrun:
-                    print(filename)
-                    print(dst_new.name)
-                else:
+
+                # Log the old and new filenames regardless dry run status
+                print(filename)
+                print(dst_new.name)
+
+                if not dryrun:
                     os.rename(src,dst_new)
                     
         # Regardles of --dry-run, print this info to output.txt for reference
