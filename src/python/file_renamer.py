@@ -126,7 +126,7 @@ def file_renamer(attributes,folder,tag,atype,dryrun=False):
                 # New File names
                 if bool(temp):
                     chStr = details[attributes[1]]
-                    chStr = str(chStr).zfill(2)
+                    chStr = str(chStr)
                     # dst = f'scan_Cam_'+re.sub('A','0',details['Cam'])+'_ch_'+details['ch']+tile+'_t_'+details['stack']+'.tif'
                     dst = f'scan_ch'+chStr+tile+'_t'+details[attributes[-1]]+'.tif'
 
@@ -144,8 +144,8 @@ def file_renamer(attributes,folder,tag,atype,dryrun=False):
                         
                     
                 else:
-                    chStr = int(details[attributes[1]])+10
-                    chStr = str(chStr).zfill(2)
+                    chStr = int(details[attributes[1]])
+                    chStr = str(chStr)
                     # dst = f'scan_Cam_'+re.sub('B','1',details['Cam'])+'_ch_'+str(int(details['ch'])+N_ch_CamA)+tile+'_t_'+details['stack']+'.tif'
                     dst = f'scan_ch'+chStr+tile+'_t'+details[attributes[-1]]+'.tif' # CamB will be offset by 10 to avoid overlapping file names
 
